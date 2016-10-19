@@ -13,6 +13,7 @@
 char tokenString[MAXTOKENLEN+1];
 char numString[MAXTOKENLEN+1];
 char tempString[MAXTOKENLEN+1];
+char prevToken[MAXTOKENLEN+1]="\0";
 %}
 
 digit       [0-9]

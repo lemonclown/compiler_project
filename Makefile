@@ -6,26 +6,23 @@
 
 CC = gcc
 
-CFLAGS = 
+CFLAGS = -Wall -g 
 
-OBJS = main.o util.o scan.o parse.o symtab.o analyze.o code.o cgen.o 
+OBJS = y.tab.o lex.yy.o main.o util.o 
 
-OBJSFLEX = lex.yy.o
+
 
 #by flex
 
-cminus_flex: $(OBJS_FLEX)
-	$(CC) $(CFLAGS) main.o util.o lex.yy.o -o cminus_flex -lfl
-
-lex.yy.o: cminus.l scan.h util.h globals.h
-	flex cminus.l
-	$(CC) $(CFLAGS) -c lex.yy.c -lfl
-
-tiny: $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o tiny
+cminus: $(OBJS)
+		$(CC) $(CFLAGS) $(OBJS) -o cminus -lfl
 
 main.o: main.c globals.h util.h scan.h parse.h analyze.h cgen.h
 	$(CC) $(CFLAGS) -c main.c
+
+y.tab.o: yacc/cminus.y globals.h
+	yacc -d yacc/cminus.y
+	$(CC) $(CFLAGS) -c y.tab.c
 
 util.o: util.c util.h globals.h
 	$(CC) $(CFLAGS) -c util.c
@@ -47,6 +44,10 @@ code.o: code.c code.h globals.h
 
 cgen.o: cgen.c globals.h symtab.h code.h cgen.h
 	$(CC) $(CFLAGS) -c cgen.c
+
+lex.yy.o: cminus.l scan.h util.h globals.h
+	flex cminus.l
+	$(CC) $(CFLAGS) -c lex.yy.c -lfl
 
 
 clean:
