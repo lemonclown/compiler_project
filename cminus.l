@@ -11,6 +11,8 @@
 #include "scan.h"
 /* lexeme of identifier or reserved word */
 char tokenString[MAXTOKENLEN+1];
+char numString[MAXTOKENLEN+1];
+char tempString[MAXTOKENLEN+1];
 %}
 
 digit       [0-9]
@@ -23,13 +25,7 @@ whitespace  [ \t]+
 %%
 
 "if"            {return IF;}
-"then"          {return THEN;}
 "else"          {return ELSE;}
-"end"           {return END;}
-"repeat"        {return REPEAT;}
-"until"         {return UNTIL;}
-"read"          {return READ;}
-"write"         {return WRITE;}
 "while"		{return WHILE;}
 "int"		{return INT;}
 "void"		{return VOID;}

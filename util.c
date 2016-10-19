@@ -15,13 +15,7 @@
 void printToken( TokenType token, const char* tokenString )
 { switch (token)
   { case IF:
-    case THEN:
     case ELSE:
-    case END:
-    case REPEAT:
-    case UNTIL:
-    case READ:
-    case WRITE:
     case INT:
     case VOID:
     case RETURN:
@@ -84,6 +78,20 @@ TreeNode * newStmtNode(StmtKind kind)
   return t;
 }
 
+TreeNode * newDeclNode(DeclKind kind)
+{ TreeNode * t = (TreeNode *) malloc(sizeof(TreeNode));
+  int i;
+  if (t==NULL)
+	fprintf(listing,"Out of memory error at line %d\n",lineno);
+  else {
+    for (i=0;i<MAXCHILDREN;i++) t->child[i] = NULL;
+	t->sibling = NULL;
+	t->nodekind = DeclK;
+	t->kind.decl = kind;
+	t->lineno = lineno;
+  }
+  return t;
+}
 /* Function newExpNode creates a new expression 
  * node for syntax tree construction
  */
@@ -147,18 +155,14 @@ void printTree( TreeNode * tree )
         case IfK:
           fprintf(listing,"If\n");
           break;
-        case RepeatK:
-          fprintf(listing,"Repeat\n");
-          break;
-        case AssignK:
-          fprintf(listing,"Assign to: %s\n",tree->attr.name);
-          break;
-        case ReadK:
-          fprintf(listing,"Read: %s\n",tree->attr.name);
-          break;
-        case WriteK:
-          fprintf(listing,"Write\n");
-          break;
+		case CompK:
+		  fprintf(listing,"Compound Statement : \n");
+		  break;
+		case RetK:
+		  fprintf(listing,"Return : \n");
+		  break;
+		case IterK:
+		  fprintf(listing,"Iteration : \n");
         default:
           fprintf(listing,"Unknown ExpNode kind\n");
           break;
@@ -176,11 +180,33 @@ void printTree( TreeNode * tree )
         case IdK:
           fprintf(listing,"Id: %s\n",tree->attr.name);
           break;
+		case AssignK:
+		  fprintf(listing,"Assign : ");
+		  break;
+		case CalK:
+		  fprintf(listing,"Call, name : %s, with arguments below", tree->attr.name);
+		  break;
         default:
           fprintf(listing,"Unknown ExpNode kind\n");
           break;
       }
     }
+	else if (tree->nodekind==DeclK)
+	{ switch (tree->kind.decl) {
+		case FuncK:
+		  fprintf(listing,"Function Declaration, name : %s, return type : %s\n",tree->attr.name, tree->type);
+		  break;
+		case VarK:
+		  fprintf(listing,"Var declaration, name : %s, type : %s\n", tree->attr.name, tree->type);
+		  break;
+		case ArrK:
+		  fprintf(listing,"Array declaration, name : %s, type :%s, size : %d\n", tree->attr.arr.name, tree->type, tree->attr.arr.size);
+		  break;
+		default:
+		  fprintf(listing,"Unknown DeclNode kind\n");
+		  break;
+	  }
+	}
     else fprintf(listing,"Unknown node kind\n");
     for (i=0;i<MAXCHILDREN;i++)
          printTree(tree->child[i]);
