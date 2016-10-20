@@ -119,8 +119,8 @@ param       : type_spec saveName
 			;
 comp_stmt   : LCURLY local_decls stmt_list RCURLY
 			{ $$ = newStmtNode(CompK);
-			  $$->child[0] = $2; /* local variable decl */
-			  $$->child[1] = $3; /* statement */
+			  $$->child[0] = $2;
+			  $$->child[1] = $3;
 			}
 			;
 local_decls : local_decls var_decl

@@ -71,17 +71,15 @@ typedef enum {TypeNameK} TypeKind;
 
 /* ArrayAttr is used for attributes for array variables */
 typedef struct arrayAttr {
-		    TokenType type;
-			    char * name;
-				    int size;
+	TokenType type;
+	char * name;
+	int size;
 } ArrayAttr;
 
 /* ExpType is used for type checking */
 typedef enum {Void,Integer,Boolean, IntegerArray} ExpType;
 
 #define MAXCHILDREN 3
-
-struct ScopeRec;
 
 typedef struct treeNode
 { struct treeNode * child[MAXCHILDREN];
@@ -98,7 +96,7 @@ typedef struct treeNode
 				int val;
 				char * name;
 				ArrayAttr arr;
-				struct ScopeRec * scope; } attr;
+			   } attr;
 		ExpType type; /* for type checking of exps */
 } TreeNode;
 
