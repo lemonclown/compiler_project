@@ -69,9 +69,9 @@ static void afterInsert( TreeNode * t)
       switch (t->kind.stmt)
       {
         case CompK:
-        case IterK:
           printf("pop\n");
           pop_scope();
+          location--;
           break;
         default:
           break;
@@ -94,13 +94,8 @@ static void insertNode( TreeNode * t)
               isFuncC = FALSE;
             else{
               ScopeList newScope = createscope(scope);
-              push_scope(newScope);
+              push_scope(newScope); location++;
             }
-          break;
-        case IterK:
-            printf("IterK\n");
-            scope = "while";
-            push_scope(createscope(scope));
           break;
         default:
           break;
@@ -128,9 +123,9 @@ static void insertNode( TreeNode * t)
             if ( st_lookup(scope, t->attr.name) >= 0 )
               symbolError(t, "Declared symbol");
             else{
-              st_insert(t->attr.name,t->attr.name,t->child[0]->attr.type,t->lineno, location++);
+              st_insert(t->attr.name,t->attr.name,t->child[0]->attr.type,t->lineno, location);
               scope = t->attr.name;
-              push_scope(createscope(scope));
+              push_scope(createscope(scope)); location++;
             }
             printf("end\n");
           break;
@@ -187,7 +182,7 @@ void insertGeneralFunc()
   func->child[1] = NULL;
   func->child[2] = comp_stmt;
 
-  st_insert(NULL, "input", Void, -1, location);
+  st_insert(NULL, "input", type->attr.type, -1, location);
 
   func = newDeclNode(FuncK);
   type = newTypeNode(TypeNameK);
@@ -210,14 +205,14 @@ void insertGeneralFunc()
   func->child[1] = param;
   func->child[2] = comp_stmt;
 
-  st_insert(NULL, "output", Integer, -1, location);
+  st_insert(NULL, "output", type->attr.type, -1, location);
 }
 /* Function buildSymtab constructs the symbol 
  * table by preorder traversal of the syntax tree
  */
 void buildSymtab(TreeNode * syntaxTree)
 { printf("buildSymTab\n");
-  g_scope = createscope(NULL);
+  g_scope = createscope("Global");
   push_scope(g_scope);
   insertGeneralFunc();
   traverse(syntaxTree,insertNode,afterInsert);

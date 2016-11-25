@@ -132,10 +132,11 @@ void printSymTab(FILE * listing)
 { printf("print\n\n");
   int i,j;
   char * type;
-  for(i=1;i<scopeindex;i++)
+  for(i=0;i<scopeindex;i++)
   {
     ScopeList scope = scopelist[i];
     fprintf(listing, "%s \n",scope->name);
+    fprintf(listing, "=============================\n");
     for(j=0;j<SIZE;j++)
     {
       BucketList bucket = scope->bucket[j];
@@ -158,6 +159,6 @@ void printSymTab(FILE * listing)
         bucket = bucket->next;
       }
     }
-    fprintf(listing, "==========================\n");
+    fprintf(listing, "\n\n");
   }
 } /* printSymTab */
