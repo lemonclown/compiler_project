@@ -198,7 +198,8 @@ var         : saveName
 			  $$->attr.name = savedName;
 			}
 			LBRACE exp RBRACE
-			{ $$->child[0] = $3;}
+			{ $$ = $2;
+			$$->child[0] = $4;}
 			;
 simple_exp  : add_exp relop add_exp
 			{

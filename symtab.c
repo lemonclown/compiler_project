@@ -12,13 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "symtab.h"
-
-/* SIZE is the size of the hash table */
-#define SIZE 211
-
-/* SHIFT is the power of two used as multiplier
-   in hash function  */
-#define SHIFT 4
+#include "globals.h"
 
 /* the hash function */
 static int hash ( char * key )
@@ -31,49 +25,62 @@ static int hash ( char * key )
   return temp;
 }
 
-/* the list of line numbers of the source 
- * code in which a variable is referenced
- */
-typedef struct LineListRec
-   { int lineno;
-     struct LineListRec * next;
-   } * LineList;
-
-/* The record in the bucket lists for
- * each variable, including name, 
- * assigned memory location, and
- * the list of line numbers in which
- * it appears in the source code
- */
-typedef struct BucketListRec
-   { char * name;
-     LineList lines;
-     int memloc ; /* memory location for variable */
-     struct BucketListRec * next;
-   } * BucketList;
-
 /* the hash table */
 static BucketList hashTable[SIZE];
+static ScopeList scopeStack[STACK];
+static ScopeList scopelist[SIZE];
+int scopeindex = 0;
+int scopestack_i = 0;
 
+ScopeList topscope()
+{
+  return scopeStack[scopestack_i-1];
+}
+
+ScopeList createscope(char * name)
+{
+  ScopeList newScope;
+
+  newScope = (ScopeList) malloc(sizeof(struct ScopeListRec));
+  newScope->name = name;
+  newScope->parent = topscope();
+  scopelist[scopeindex++] = newScope;
+
+  return newScope;
+}
+
+void push_scope(ScopeList scope)
+{
+  printf("pushpush \n");
+  scopeStack[scopestack_i++] = scope;
+}
+
+void pop_scope()
+{
+  scopestack_i--;
+}
 /* Procedure st_insert inserts line numbers and
  * memory locations into the symbol table
  * loc = memory location is inserted only the
  * first time, otherwise ignored
  */
-void st_insert( char * name, int lineno, int loc )
+void st_insert( char * scope, char * name, ExpType type, int lineno, int loc )
 { int h = hash(name);
-  BucketList l =  hashTable[h];
+  ScopeList topsc = topscope();
+  BucketList l =  topsc->bucket[h];
   while ((l != NULL) && (strcmp(name,l->name) != 0))
     l = l->next;
   if (l == NULL) /* variable not yet in table */
   { l = (BucketList) malloc(sizeof(struct BucketListRec));
+    l->scope = scope;
     l->name = name;
+    l->type = type;
     l->lines = (LineList) malloc(sizeof(struct LineListRec));
     l->lines->lineno = lineno;
     l->memloc = loc;
     l->lines->next = NULL;
-    l->next = hashTable[h];
-    hashTable[h] = l; }
+    l->next = topsc->bucket[h];
+    topsc->bucket[h] = l; }
   else /* found in table, so just add line number */
   { LineList t = l->lines;
     while (t->next != NULL) t = t->next;
@@ -86,37 +93,71 @@ void st_insert( char * name, int lineno, int loc )
 /* Function st_lookup returns the memory 
  * location of a variable or -1 if not found
  */
-int st_lookup ( char * name )
+int st_lookup ( char * scope, char * name )
 { int h = hash(name);
-  BucketList l =  hashTable[h];
-  while ((l != NULL) && (strcmp(name,l->name) != 0))
-    l = l->next;
-  if (l == NULL) return -1;
-  else return l->memloc;
+  ScopeList tscope = topscope();
+  while(tscope)
+  {
+    BucketList l =  tscope->bucket[h];
+    while((l != NULL) && (strcmp(name,l->name) != 0))
+      l = l->next;
+    if (l != NULL) return l->memloc; 
+    else if ( tscope->parent != NULL) tscope = tscope->parent;
+    else return -1;
+  }
 }
-
+/*
+int sc_lookup ( char * name )
+{
+  int i;
+  for(i=scopestack_i-1; i>=0; i--)
+  {
+    if(scopelist[i]->name == name)
+      return i;
+  }
+  return -1;
+  int h = hash(name);
+  ScopeList l = scopeTable[h];
+  while ((l != NULL) && (strcmp(name,l->name) != 0))
+    l = l->parent;
+  if (l == NULL) return -1;
+  else return l->bucket;
+}
+*/
 /* Procedure printSymTab prints a formatted 
  * listing of the symbol table contents 
  * to the listing file
  */
 void printSymTab(FILE * listing)
-{ int i;
-  fprintf(listing,"Variable Name  Location   Line Numbers\n");
-  fprintf(listing,"-------------  --------   ------------\n");
-  for (i=0;i<SIZE;++i)
-  { if (hashTable[i] != NULL)
-    { BucketList l = hashTable[i];
-      while (l != NULL)
-      { LineList t = l->lines;
-        fprintf(listing,"%-14s ",l->name);
-        fprintf(listing,"%-8d  ",l->memloc);
-        while (t != NULL)
-        { fprintf(listing,"%4d ",t->lineno);
-          t = t->next;
+{ printf("print\n\n");
+  int i,j;
+  char * type;
+  for(i=1;i<scopeindex;i++)
+  {
+    ScopeList scope = scopelist[i];
+    fprintf(listing, "%s \n",scope->name);
+    for(j=0;j<SIZE;j++)
+    {
+      BucketList bucket = scope->bucket[j];
+      while(bucket!=NULL)
+      {
+        switch(bucket->type){
+          case INT:
+            type = "int";
+            break;
+          case VOID:
+            type = "void";
+            break;
+          default:
+            type = "???";
+            break;
         }
-        fprintf(listing,"\n");
-        l = l->next;
+        fprintf(listing, "name   type   lines   loc   \n");
+        fprintf(listing, "------------------------------\n");
+        fprintf(listing, "%s      %s     %d     %d\n", bucket->name,type,bucket->lines->lineno,bucket->memloc);
+        bucket = bucket->next;
       }
     }
+    fprintf(listing, "==========================\n");
   }
 } /* printSymTab */
