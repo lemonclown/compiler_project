@@ -48,6 +48,12 @@ typedef struct ScopeListRec
   struct ScopeListRec * parent;
 } * ScopeList;
 
+typedef struct FuncParamRec
+{
+	char * name;
+	TreeNode * treenode;
+} * FuncParam;
+
 ScopeList g_scope;
 /* Procedure st_insert inserts line numbers and
  * memory locations into the symbol table
@@ -66,8 +72,15 @@ int st_lookup ( char * scope, char * name );
  * to the listing file
  */
 void printSymTab(FILE * listing);
-
+FuncParam getpl(char *name);
+FuncParam createpl(char * name, TreeNode * tree);
+void push_pl();
+ScopeList createscope(char * name);
 void push_scope();
 void pop_scope();
+ExpType type_lookup ( char * scope, char * name);
+int st_lookup_cur ( char * scope, char * name);
+ExpType sc_lookup ( char * name );
+void add_line(char * name, int lineno);
 
 #endif

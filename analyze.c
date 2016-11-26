@@ -15,7 +15,6 @@
 static int location = 0;
 static char * scope;
 static int isFuncC = FALSE;
-
 /* Procedure traverse is a generic recursive 
  * syntax tree traversal routine:
  * it applies preProc in preorder and postProc 
@@ -47,18 +46,21 @@ static void nullProc(TreeNode * t)
 static void symbolError(TreeNode * t, char * err)
 {
   char * type;
-  switch(t->child[0]->attr.type){
-    case INT:
+  switch(t->type){
+    case Integer:
       type = "int";
       break;
-    case VOID:
+    case Void:
       type = "void";
       break;
+    case IntegerArray:
+      type = "IntegerArray";
+      break;
     default:
-      type = "???";
+      type = "void";
       break;
   }
-  fprintf(listing,"undeclared %s %s at line %d : %s \n", type, t->attr.name, t->lineno, err);
+  fprintf(listing,"Err %s %s at line %d : %s \n", type, t->attr.name, t->lineno, err);
 }
 
 static void afterInsert( TreeNode * t)
@@ -69,7 +71,6 @@ static void afterInsert( TreeNode * t)
       switch (t->kind.stmt)
       {
         case CompK:
-          printf("pop\n");
           pop_scope();
           location--;
           break;
@@ -89,7 +90,6 @@ static void insertNode( TreeNode * t)
       switch (t->kind.stmt)
       { 
         case CompK:
-            printf("CompK\n");
             if(isFuncC)
               isFuncC = FALSE;
             else{
@@ -106,10 +106,15 @@ static void insertNode( TreeNode * t)
       { case IdK:
         case ArrIdK:
         case CallK:
-          printf("ExpK\n");
-          printf("%s \n",t->attr.name);
           if (st_lookup(scope, t->attr.name) == -1)
             symbolError(t, "undeclared symbol");
+          else
+            add_line(t->attr.name, t->lineno);
+          break;
+        case AssignK:
+          if( t->child[0]->type != t->child[1]->type )
+            symbolError(t, "differnt type");
+
           break;
         default:
           break;
@@ -118,41 +123,69 @@ static void insertNode( TreeNode * t)
     case DeclK:
       switch (t->kind.exp)
       { case FuncK:
-            printf("FuncK %s\n", t->attr.name);
             isFuncC = TRUE;
             if ( st_lookup(scope, t->attr.name) >= 0 )
               symbolError(t, "Declared symbol");
             else{
-              st_insert(t->attr.name,t->attr.name,t->child[0]->attr.type,t->lineno, location);
+              switch(t->child[0]->attr.type){
+                case INT:
+                  t->type = Integer;
+                  break;
+                case VOID:
+                default:
+                  t->type = Void;
+                  break;
+                }
+              }
+              st_insert("Func",t->attr.name,t->type,t->lineno, location);
               scope = t->attr.name;
               push_scope(createscope(scope)); location++;
-            }
-            printf("end\n");
+              
           break;
         case VarK:
-            printf("VarK : %s\n", t->attr.name);
-            if ( st_lookup(scope,t->attr.name) >= 0 )
+            if ( st_lookup_cur(scope,t->attr.name) >= 0 )
               symbolError(t, "Declared symbol");
-            else
-              st_insert(scope, t->attr.name, t->child[0]->attr.type, t->lineno, location);
+            else{
+              if (t->child[0]->attr.type == VOID){
+                symbolError(t,"variable cannot have void type");
+                break;
+              }
+              t->type = Integer;
+              st_insert("Var", t->attr.name, t->type, t->lineno, location);
+            }
           break;
         case ArrVarK:
-            printf("VarK : %s\n", t->attr.arr.name);
-            if ( st_lookup(scope,t->attr.arr.name) >= 0 )
+            if ( st_lookup_cur(scope,t->attr.arr.name) >= 0 )
               symbolError(t, "Declared symbol");
-            else
-              st_insert(scope, t->attr.arr.name, t->child[0]->attr.type, t->lineno, location);
+            else{
+              if (t->child[0]->attr.type == VOID){
+                symbolError(t,"variable cannot have void type");
+                break;
+              }
+              t->type = IntegerArray;
+              st_insert("Var", t->attr.arr.name, t->type, t->lineno, location);
+            }
           break;
         default:
           break;
       }
       break;
     case ParamK:
-          printf("ParamK\n");
-          if ( st_lookup(scope, t->attr.name) >= 0 )
+          if ( st_lookup("Var", t->attr.name) >= 0 )
             symbolError(t, "Declared symbol");
-          else
-            st_insert(scope, t->attr.name, t->child[0]->attr.type, t->lineno, location);
+          else{
+            switch(t->kind.param){
+              case ArrParamK:
+                  t->type = IntegerArray;
+                  st_insert("Var", t->attr.name, t->type, t->lineno, location);
+                  break;
+              default:
+                  t->type = Integer;
+                  st_insert("Var", t->attr.name, t->type, t->lineno, location);
+                  break;
+            }
+            
+          }
       break;
     default:
       break;
@@ -182,7 +215,8 @@ void insertGeneralFunc()
   func->child[1] = NULL;
   func->child[2] = comp_stmt;
 
-  st_insert(NULL, "input", type->attr.type, -1, location);
+  st_insert("Func", "input", func->type, -1, location);
+  push_pl(createpl("input",func));
 
   func = newDeclNode(FuncK);
   type = newTypeNode(TypeNameK);
@@ -205,19 +239,21 @@ void insertGeneralFunc()
   func->child[1] = param;
   func->child[2] = comp_stmt;
 
-  st_insert(NULL, "output", type->attr.type, -1, location);
+  st_insert("Func", "output", func->type, -1, location);
+  push_pl(createpl("output",func));
+
 }
 /* Function buildSymtab constructs the symbol 
  * table by preorder traversal of the syntax tree
  */
 void buildSymtab(TreeNode * syntaxTree)
-{ printf("buildSymTab\n");
+{ 
   g_scope = createscope("Global");
   push_scope(g_scope);
   insertGeneralFunc();
   traverse(syntaxTree,insertNode,afterInsert);
   if (TraceAnalyze)
-  { printf("printsymtab\n");
+  { 
     fprintf(listing,"\nSymbol table:\n\n");
     printSymTab(listing);
   }
@@ -228,40 +264,128 @@ static void typeError(TreeNode * t, char * message)
   Error = TRUE;
 }
 
-/* Procedure checkNode performs
- * type checking at a single tree node
- */
-static void checkNode(TreeNode * t)
-{ /*switch (t->nodekind)
-  { case ExpK:
-      switch (t->kind.exp)
-      { case OpK:
-          if ((t->child[0]->type != Integer) ||
-              (t->child[1]->type != Integer))
-            typeError(t,"Op applied to non-integer");
-          if ((t->attr.op == EQ) || (t->attr.op == LT))
-            t->type = Boolean;
-          else
-            t->type = Integer;
-          break;
-        case ConstK:
-        case IdK:
-          t->type = Integer;
+static void beforeCheck(TreeNode * t)
+{ switch (t->nodekind)
+  { case DeclK:
+      switch (t->kind.decl)
+      { case FuncK:
+          scope = t->attr.name;
+          push_pl(createpl(t->attr.name, t));
           break;
         default:
           break;
       }
       break;
-    case StmtK:
+    case ExpK:
+      switch (t->kind.exp)
+      {
+        case IdK:
+          t->type = type_lookup(scope, t->attr.name);
+          break;
+        case ArrIdK:
+          t->type = type_lookup(scope, t->attr.name);
+          break;
+        case CallK:
+          t->type = sc_lookup(t->attr.name);
+          break;
+        default:
+         break;
+      }
+    default:
+      break;
+  }
+}
+
+/* Procedure checkNode performs
+ * type checking at a single tree node
+ */
+static void checkNode(TreeNode * t)
+{ //printf("  %d \n", t->lineno);
+  switch (t->nodekind)
+  { case StmtK:
       switch (t->kind.stmt)
-      { case IfK:
-          if (t->child[0]->type == Integer)
-            typeError(t->child[0],"if test is not Boolean");
+      {
+        case CompK:
           break;
-        case AssignK:
-          if (t->child[0]->type != Integer)
-            typeError(t->child[0],"assignment of non-integer value");
+        case IfK:{
+          if( t->child[0]->child[0]->type == Void)
+            typeError(t->child[0], "no void");
+        }
           break;
+        case IterK:{
+          if( t->child[0]->child[0]->type == Void)
+            typeError(t->child[0], "no void");
+        }
+          break;
+        case RetK:
+          {
+            const TreeNode * expr = t->child[0];
+            if((sc_lookup(scope)==Void)&&(expr != NULL && expr->type != Void)){
+              typeError(t,"Expected to return void");
+            }
+            else if((sc_lookup(scope)==Integer) && (expr == NULL || expr->type != Integer)){
+              typeError(t,"Expected to return integer");
+            }
+          }
+          break;
+      }
+      break;
+    case ExpK:
+      switch (t->kind.exp)
+      {
+        case AssignK:{
+            //printf("asign1  %s   %d \n",t->child[0]->attr.name, t->child[0]->type);
+            //printf("right        %d  \n",t->child[1]->type);
+            const ExpType type_l = t->child[0]->type;
+            const ExpType type_r = t->child[1]->type;
+            if(type_l==Void || type_r == Void){
+              typeError(t,"Void type connot assigned");
+            }
+            else
+              t->type = type_l;
+          }
+          break;
+        case OpK:{
+            ExpType type_l = t->child[0]->type;
+            ExpType type_r = t->child[1]->type;
+
+            if(type_l == Void || type_r == Void)
+              typeError(t, "void type is not allowd");
+            else
+              t->type = Integer;
+          }
+          break;
+        case ConstK:
+            t->type = Integer;
+          break;
+        case IdK:
+          break;
+        case ArrIdK:
+          break;
+        case CallK:{
+            TreeNode * func = getpl(t->attr.name)->treenode;
+            TreeNode * arg = t->child[0];
+            TreeNode * param = func->child[1];
+
+            while(arg != NULL)
+            {
+              if (param == NULL)
+                typeError(arg,"the number of parameters wrong");
+              else if(arg->type == Void)
+                typeError(arg,"void is not allowd for parameters");
+              else{
+                arg = arg->sibling;
+                param = param->sibling;
+                continue;
+              }
+              break;
+            }
+
+            if ( arg == NULL && param != NULL )
+              typeError(t,"the number of parameters wrong");
+
+            t->type = func->type;
+          }
           break;
         default:
           break;
@@ -269,13 +393,13 @@ static void checkNode(TreeNode * t)
       break;
     default:
       break;
-
-  }*/
+  }
 }
 
 /* Procedure typeCheck performs type checking 
  * by a postorder syntax tree traversal
  */
 void typeCheck(TreeNode * syntaxTree)
-{ traverse(syntaxTree,nullProc,checkNode);
+{ printf("Typecheck\n");
+  traverse(syntaxTree,beforeCheck,checkNode);
 }
