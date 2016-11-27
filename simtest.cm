@@ -25,9 +25,9 @@ void sort (int a[], int low, int high) {
 		t = a[k];   
 		a[k] = a[i];   
 		a[i] = t;   
-		a = k;
 		i = i + 1;  
 	} 
+
 } 
  
 void main(void) {  

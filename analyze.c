@@ -111,11 +111,16 @@ static void insertNode( TreeNode * t)
           else
             add_line(t->attr.name, t->lineno);
           break;
-        case AssignK:
-          if( t->child[0]->type != t->child[1]->type )
-            symbolError(t, "differnt type");
-
+        case AssignK:{
+            ExpType ty;
+            ty = type_lookup(scope,t->child[0]->attr.name);
+            if( ty == IntegerArray && t->child[0]->kind.exp == IdK )
+              symbolError(t, "cannot assign array to");
+          }
           break;
+        case ConstK:
+            t->type = Integer;
+            break;
         default:
           break;
       }
@@ -123,10 +128,10 @@ static void insertNode( TreeNode * t)
     case DeclK:
       switch (t->kind.exp)
       { case FuncK:
-            isFuncC = TRUE;
             if ( st_lookup(scope, t->attr.name) >= 0 )
               symbolError(t, "Declared symbol");
-            else{
+            else
+              isFuncC = TRUE;
               switch(t->child[0]->attr.type){
                 case INT:
                   t->type = Integer;
@@ -136,11 +141,9 @@ static void insertNode( TreeNode * t)
                   t->type = Void;
                   break;
                 }
-              }
               st_insert("Func",t->attr.name,t->type,t->lineno, location);
               scope = t->attr.name;
               push_scope(createscope(scope)); location++;
-              
           break;
         case VarK:
             if ( st_lookup_cur(scope,t->attr.name) >= 0 )
@@ -184,7 +187,6 @@ static void insertNode( TreeNode * t)
                   st_insert("Var", t->attr.name, t->type, t->lineno, location);
                   break;
             }
-            
           }
       break;
     default:
@@ -400,6 +402,6 @@ static void checkNode(TreeNode * t)
  * by a postorder syntax tree traversal
  */
 void typeCheck(TreeNode * syntaxTree)
-{ printf("Typecheck\n");
+{ 
   traverse(syntaxTree,beforeCheck,checkNode);
 }

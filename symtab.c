@@ -109,26 +109,6 @@ void st_insert( char * scope, char * name, ExpType type, int lineno, int loc )
     l->lines->next = NULL;
     l->next = topsc->bucket[h];
     topsc->bucket[h] = l; }
-  else /* found in table, so just add line number */
-  { LineList t = l->lines;
-    while(topsc != NULL)
-    { printf("%s\n",l->name);
-      l = topsc->bucket[h];
-      while((l != NULL) && (strcmp(name,l->name) !=0))
-        l=l->next;
-      if( l != NULL){
-        while (t->next != NULL) t = t->next;
-        t->next = (LineList) malloc(sizeof(struct LineListRec));
-        t->next->lineno = lineno;
-        t->next->next = NULL;
-        printf("tt\n");
-        return;
-      }
-      else if ( topsc->parent == NULL) break;
-      topsc = topsc->parent;
-    }
-    
-  }
 } /* st_insert */
 
 void add_line(char * name, int lineno)
