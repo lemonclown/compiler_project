@@ -235,6 +235,7 @@ void insertGeneralFunc()
   param->child[0] = newTypeNode(TypeNameK);
   param->child[0]->attr.type = INT;
 
+
   func->lineno = 0;
   func->attr.name = "output";
   func->child[0] = type;
@@ -368,13 +369,15 @@ static void checkNode(TreeNode * t)
             TreeNode * func = getpl(t->attr.name)->treenode;
             TreeNode * arg = t->child[0];
             TreeNode * param = func->child[1];
-
+            printf("%s\n",t->attr.name);
             while(arg != NULL)
-            {
+            { //printf("arg: %d,  param: %d,\n ",arg->child[0]->kind.exp, param->kind.param);
               if (param == NULL)
                 typeError(arg,"the number of parameters wrong");
               else if(arg->type == Void)
                 typeError(arg,"void is not allowd for parameters");
+              else if( (arg->type ==Integer)&& (param->type==IntegerArray))
+                typeError(arg,"different type parameters");
               else{
                 arg = arg->sibling;
                 param = param->sibling;
