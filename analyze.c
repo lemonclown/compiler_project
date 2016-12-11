@@ -15,6 +15,9 @@
 static int location = 0;
 static char * scope;
 static int isFuncC = FALSE;
+static int globalloc = 0;
+static int staticloc = 0;
+static int paramloc = 0;
 /* Procedure traverse is a generic recursive 
  * syntax tree traversal routine:
  * it applies preProc in preorder and postProc 
@@ -73,6 +76,8 @@ static void afterInsert( TreeNode * t)
         case CompK:
           pop_scope();
           location--;
+          paramloc = 0;
+          staticloc = 0;
           break;
         default:
           break;
@@ -141,9 +146,11 @@ static void insertNode( TreeNode * t)
                   t->type = Void;
                   break;
                 }
-              st_insert("Func",t->attr.name,t->type,t->lineno, location);
+              st_insert("Func",t->attr.name,t->type,t->lineno, location, globalloc++);
               scope = t->attr.name;
               push_scope(createscope(scope)); location++;
+              paramloc = 0;
+              staticloc = 0;
           break;
         case VarK:
             if ( st_lookup_cur(scope,t->attr.name) >= 0 )
@@ -154,7 +161,10 @@ static void insertNode( TreeNode * t)
                 break;
               }
               t->type = Integer;
-              st_insert("Var", t->attr.name, t->type, t->lineno, location);
+              if(strcmp(scope, "Global")==0)
+                st_insert("Var", t->attr.name, t->type, t->lineno, location, globalloc++);
+              else
+                st_insert("Var", t->attr.name, t->type, t->lineno, location, staticloc++);
             }
           break;
         case ArrVarK:
@@ -166,7 +176,14 @@ static void insertNode( TreeNode * t)
                 break;
               }
               t->type = IntegerArray;
-              st_insert("Var", t->attr.arr.name, t->type, t->lineno, location);
+              if(strcmp(scope, "Global")==0){
+                st_insert("Var", t->attr.arr.name, t->type, t->lineno, location, globalloc+t->attr.arr.size-1);
+                globalloc += t->attr.arr.size;
+              }
+              else{
+                st_insert("Var", t->attr.arr.name, t->type, t->lineno, location, staticloc);
+                staticloc += t->attr.arr.size;
+              }
             }
           break;
         default:
@@ -180,13 +197,14 @@ static void insertNode( TreeNode * t)
             switch(t->kind.param){
               case ArrParamK:
                   t->type = IntegerArray;
-                  st_insert("Var", t->attr.name, t->type, t->lineno, location);
+                  st_insert("Param", t->attr.name, t->type, t->lineno, location, paramloc++);
                   break;
               default:
                   t->type = Integer;
-                  st_insert("Var", t->attr.name, t->type, t->lineno, location);
+                  st_insert("Param", t->attr.name, t->type, t->lineno, location, paramloc++);
                   break;
             }
+            staticloc++;
           }
       break;
     default:
@@ -194,12 +212,13 @@ static void insertNode( TreeNode * t)
   }
 }
 
-void insertGeneralFunc()
+void insertGeneralFunc(TreeNode *t)
 {
   TreeNode * func;
   TreeNode * type;
   TreeNode * param;
   TreeNode * comp_stmt;
+  TreeNode * temp;
 
   func = newDeclNode(FuncK);
   type = newTypeNode(TypeNameK);
@@ -217,7 +236,12 @@ void insertGeneralFunc()
   func->child[1] = NULL;
   func->child[2] = comp_stmt;
 
-  st_insert("Func", "input", func->type, -1, location);
+  /*
+  temp = t;
+  t = func;
+  t->sibling = temp;
+  */
+  st_insert("Func", "input", func->type, -1, location, globalloc++);
   push_pl(createpl("input",func));
 
   func = newDeclNode(FuncK);
@@ -242,7 +266,12 @@ void insertGeneralFunc()
   func->child[1] = param;
   func->child[2] = comp_stmt;
 
-  st_insert("Func", "output", func->type, -1, location);
+  /*
+  temp = t;
+  t = func;
+  t->sibling = temp;
+  */
+  st_insert("Func", "output", func->type, -1, location, globalloc++);
   push_pl(createpl("output",func));
 
 }
@@ -252,8 +281,9 @@ void insertGeneralFunc()
 void buildSymtab(TreeNode * syntaxTree)
 { 
   g_scope = createscope("Global");
+  scope="Global";
   push_scope(g_scope);
-  insertGeneralFunc();
+  insertGeneralFunc(syntaxTree);
   traverse(syntaxTree,insertNode,afterInsert);
   if (TraceAnalyze)
   { 

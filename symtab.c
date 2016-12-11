@@ -14,6 +14,7 @@
 #include "symtab.h"
 #include "globals.h"
 
+char * scope_name;
 /* the hash function */
 static int hash ( char * key )
 { int temp = 0;
@@ -74,7 +75,8 @@ ScopeList createscope(char * name)
   newScope->name = name;
   newScope->parent = topscope();
   scopelist[scopeindex++] = newScope;
-
+  newScope->paramNum = 0;
+  newScope->varNum = 0;
   return newScope;
 }
 
@@ -92,7 +94,8 @@ void pop_scope()
  * loc = memory location is inserted only the
  * first time, otherwise ignored
  */
-void st_insert( char * scope, char * name, ExpType type, int lineno, int loc )
+
+void st_insert( char * scope, char * name, ExpType type, int lineno, int loc ,int mloc)
 { int h = hash(name);
   ScopeList topsc = topscope();
   BucketList l =  topsc->bucket[h];
@@ -107,7 +110,12 @@ void st_insert( char * scope, char * name, ExpType type, int lineno, int loc )
     l->lines->lineno = lineno;
     l->memloc = loc;
     l->lines->next = NULL;
+    l->mloc = mloc;
     l->next = topsc->bucket[h];
+    if(strcmp(scope,"Param")==0)
+      topsc->paramNum++;
+    else if(strcmp(scope,"Var")==0)
+      topsc->varNum++;
     topsc->bucket[h] = l; }
 } /* st_insert */
 
@@ -143,14 +151,18 @@ void add_line(char * name, int lineno)
  */
 int st_lookup ( char * scope, char * name )
 { int h = hash(name);
-  ScopeList tscope = topscope();
+  ScopeList tscope = scopeStack[scopestack_i-1];
+  scope_name = tscope->name;
   while(tscope!=NULL)
   {
     BucketList l =  tscope->bucket[h];
     while((l != NULL) && (strcmp(name,l->name) != 0))
       l = l->next;
-    if (l != NULL) return l->memloc; 
-    else if ( tscope->parent != NULL) tscope = tscope->parent;
+    if (l != NULL) return l->mloc; 
+    else if ( tscope->parent != NULL) {
+      tscope = tscope->parent;
+      scope_name = tscope->name;
+    }
     else return -1;
   }
 }
@@ -204,6 +216,16 @@ ExpType sc_lookup ( char * name )
   return -1;
 }
 
+ScopeList scope_lookup( char * name )
+{
+  int i;
+  for(i=0;i<scopeindex;i++)
+  {
+    if(strcmp(scopelist[i]->name,name) == 0)
+      return scopelist[i];
+  }
+  return -1;
+}
 /* Procedure printSymTab prints a formatted 
  * listing of the symbol table contents 
  * to the listing file
@@ -215,7 +237,7 @@ void printSymTab(FILE * listing)
   for(i=0;i<scopeindex;i++)
   {
     ScopeList scope = scopelist[i];
-    fprintf(listing, "%s \n",scope->name);
+    fprintf(listing, "%s , param Num : %d\n",scope->name, scope->paramNum);
     fprintf(listing, "======================================================\n");
     fprintf(listing, "name    type          IDtype   loc     lines\n");
     fprintf(listing, "------------------------------------------------------\n");
@@ -247,8 +269,9 @@ void printSymTab(FILE * listing)
           fprintf(listing,"%d ",line->lineno);
           line= line->next;
         }
-        
+        fprintf(listing,"//%d",bucket->mloc);
         fprintf(listing, "\n");
+
     //    fprintf(listing, "%s      %-4s     %-8d     %-12d\n", bucket->name,type,bucket->lines->lineno,bucket->memloc);
         bucket = bucket->next;
       }

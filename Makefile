@@ -8,7 +8,7 @@ CC = gcc
 
 CFLAGS = -Wall -g 
 
-OBJS = y.tab.o lex.yy.o main.o util.o symtab.o analyze.o 
+OBJS = y.tab.o lex.yy.o main.o util.o symtab.o analyze.o cgen.o code.o
 
 
 

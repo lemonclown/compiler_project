@@ -14,6 +14,8 @@
 #define SIZE 211
 #define STACK 211
 
+char * scope_name;
+
 /* SHIFT is the power of two used as multiplier
    in hash function  */
 #define SHIFT 4
@@ -38,6 +40,7 @@ typedef struct BucketListRec
      ExpType type;
      LineList lines;
      int memloc ; /* memory location for variable */
+     int mloc;
      struct BucketListRec * next;
    } * BucketList;
 
@@ -46,21 +49,25 @@ typedef struct ScopeListRec
 { char *name;
   BucketList bucket[SIZE];
   struct ScopeListRec * parent;
+  int paramNum;
+  int varNum;
 } * ScopeList;
 
 typedef struct FuncParamRec
 {
 	char * name;
 	TreeNode * treenode;
+  int paramNum;
 } * FuncParam;
 
 ScopeList g_scope;
+ScopeList scope_lookup( char * name );
 /* Procedure st_insert inserts line numbers and
  * memory locations into the symbol table
  * loc = memory location is inserted only the
  * first time, otherwise ignored
  */
-void st_insert( char * scope, char * name, ExpType type, int lineno, int loc );
+void st_insert( char * scope, char * name, ExpType type, int lineno, int loc, int mloc );
 
 /* Function st_lookup returns the memory 
  * location of a variable or -1 if not found
