@@ -98,6 +98,9 @@ void pop_scope()
 void st_insert( char * scope, char * name, ExpType type, int lineno, int loc ,int mloc)
 { int h = hash(name);
   ScopeList topsc = topscope();
+  while(strcmp(topsc->name,"")==0){
+    topsc = topsc->parent;
+  }
   BucketList l =  topsc->bucket[h];
   while ((l != NULL) && (strcmp(name,l->name) != 0))
     l = l->next;
@@ -221,8 +224,9 @@ ScopeList scope_lookup( char * name )
   int i;
   for(i=0;i<scopeindex;i++)
   {
-    if(strcmp(scopelist[i]->name,name) == 0)
-      return scopelist[i];
+    if(strcmp(scopelist[i]->name,name) == 0){
+        return scopelist[i];
+    }
   }
   return -1;
 }

@@ -16,13 +16,11 @@
    It is decremented each time a temp is
    stored, and incremeted when loaded again
 */
-static int tmpOffset = 0;
-static int idaOffset = 0;
 static int paramOffset = 0;
 static int argOffset = -3;
 static int isinFunc = FALSE;
 static int isReturned = FALSE;
-static int varOffset = 0;
+
 static char * prevScope;
 /* prototype for internal recursive code generator */
 static void cGen (TreeNode * tree);
@@ -36,7 +34,6 @@ static void genStmt( TreeNode * tree)
   int savedLoc1,savedLoc2,currentLoc;
   int paramnum, varnum;
   ScopeList Scope;
-  int loc;
   switch (tree->kind.stmt) {
       case CompK:
         if(TraceCode) emitComment("-> Compound Stmt");
@@ -49,13 +46,10 @@ static void genStmt( TreeNode * tree)
           cGen(p2);
           pop_scope(scope_lookup(scope));
           prevScope = scope;
-          
-
         }
         else{
           cGen(p1);
           cGen(p2);
-          varOffset--;
         }
         
         if(TraceCode) emitComment("<- Compound Stmt");
@@ -90,13 +84,9 @@ static void genStmt( TreeNode * tree)
          if (TraceCode) emitComment("-> return");
          p1 = tree->child[0];
          cGen(p1);
-         printf("argOFfset : %d\n", argOffset);
          Scope = scope_lookup(scope);
          paramnum = Scope->paramNum;
          varnum = Scope->varNum;
-         //while(argOffset != -3){
-         printf("pn : %d\n", paramnum);
-         printf("vn : %d\n", varnum);
          paramnum += varnum;
          //param
          while(paramnum!=0){
@@ -139,21 +129,6 @@ static void genStmt( TreeNode * tree)
         emitBackup(savedLoc2);
         emitRM_Abs("JEQ",ac,currentLoc,"while: jmp to end");
         emitRestore();
-
-        // p1 = tree->child[0] ;
-        // p2 = tree->child[1] ;
-        // savedLoc1 = emitSkip(0);
-        // emitComment("repeat: jump after body comes back here");
-        // /* generate code for body */
-        // cGen(p1);
-        // savedLoc2=emitSkip(1);
-        //  generate code for test 
-        // cGen(p2);
-        // currentLoc = emitSkip(0);
-        // emitBackup(savedLoc2);
-        // emitRM_Abs("JNE", ac, currentLoc,"while: jmp to end");
-        // emitRestore();
-        // emitRM_Abs("JEQ",ac,savedLoc1,"repeat: jmp back to body");
         if (TraceCode)  emitComment("<- while") ;
         break; /* repeat */
       default:
@@ -249,7 +224,6 @@ static void genExp( TreeNode * tree, int lhs)
       paramnum = Scope->paramNum;
       loc = -st_lookup("temp",tree->attr.name);
       type = type_lookup(scope, tree->attr.name);
-      printf("%s : %s : %d // %d\n", tree->attr.name,Scope->name, loc, paramnum);
 
       if(lhs || type == IntegerArray){
         if(strcmp(scope_name,"Global")==0){
@@ -283,7 +257,6 @@ static void genExp( TreeNode * tree, int lhs)
       paramnum = Scope->paramNum;
       loc = st_lookup("temp", tree->attr.name);
       currentLoc = emitSkip(0);
-      printf("%s %d %d\n", Scope->name, Scope->paramNum, loc);
       
       emitRM("LDC", ac1, loc, 0,"load loc");
       if(lhs){
@@ -315,7 +288,6 @@ static void genExp( TreeNode * tree, int lhs)
             emitRM("LD", ac, 0, ac, "load value array offset");
           }
           else{
-            printf("Tt\n");
             //emitRM("LD", ac, fp, ac1, "store memloc in ac :Local");
             emitRO("ADD", ac, ac1, ac, "add array offset");
             emitRO("SUB", ac, fp, ac,"sub arr loc fp, store");
@@ -412,8 +384,8 @@ static void genDecl(TreeNode * tree)
   TreeNode * p1, * p2;
   ScopeList Scope;
   int paramnum, varnum;
-  int size, loc;
-  int currentLoc, savedLoc1, savedLoc2;
+  int loc;
+  int currentLoc, savedLoc1;
   char buffer[100];
   switch(tree->kind.decl)
   {
@@ -425,6 +397,8 @@ static void genDecl(TreeNode * tree)
       isinFunc = TRUE;
       isReturned = FALSE;
       scope = tree->attr.name;
+      Scope = scope_lookup(scope);
+      varnum = Scope->varNum;
       loc = st_lookup(scope, tree->attr.name);
       emitRM("LDA", ac, 2, pc, "pc+2");
       emitRM("ST", ac, loc, gp, "load function");
@@ -433,13 +407,16 @@ static void genDecl(TreeNode * tree)
       
       p1 = tree->child[1]; 
       //body
+      while(varnum!=0){
+        emitRM("LDA", sp, -1, sp, "move stack pointer -1 : var");
+        varnum--;
+      }
       p2 = tree->child[2];
 
       cGen(p1);
       cGen(p2);
       if(TraceCode) {
         paramOffset = 0;
-        varOffset = 0;
         sprintf(buffer,"<- Func Decl : %s", tree->attr.name);
         emitComment(buffer);
       }
@@ -450,18 +427,12 @@ static void genDecl(TreeNode * tree)
             Scope = scope_lookup(prevScope);
            paramnum = Scope->paramNum;
            varnum = Scope->varNum;
-           //while(argOffset != -3){
-           printf("%s\n", Scope->name);
-           printf("pn : %d\n", paramnum);
-           printf("vn : %d\n", varnum);
            paramnum += varnum;
            //param
            while(paramnum!=0){
             emitRM("LDA", sp, 1, sp, "move stack pointer +1 : return");
             paramnum--;
           }
-          printf("argOFfset : %d\n", argOffset);
-           //while(argOffset != -3){
            //param
             //fp
            emitRM("LD", fp, 1, sp,"restore old fp");
@@ -480,18 +451,6 @@ static void genDecl(TreeNode * tree)
       emitRM("LDC", pc, currentLoc, 0,"jump to function end");
       emitRestore();
       break;
-    case VarK:
-    case ArrVarK:
-      if(TraceCode) emitComment("-> Var Decl");
-      if(tree->kind.decl == ArrVarK)
-        size = tree->attr.arr.size;
-      else
-        size = 1;
-      if(strcmp(scope,"Global")!=0)
-        emitRM("LDA", sp, -size, sp,"allocate memory");
-      varOffset++;
-      if(TraceCode) emitComment("<- Var Decl");
-      break;
     default:
       break;
   }
@@ -504,8 +463,6 @@ static void genParam(TreeNode * tree)
     case NonArrParamK:
     case ArrParamK:
       if(TraceCode) emitComment("-> param");
-      //if(tree->sibling!=NULL)
-      //  genParam(tree->sibling);
       emitRM("LDA", sp, -1, sp, "move stack pointer -1 : param");
       paramOffset++;
       emitComment(tree->attr.name);
@@ -542,29 +499,6 @@ static void cGen( TreeNode * tree)
   }
 }
 
-void generateGeneralFunc()
-{
-  /* input */
-  if(TraceCode) emitComment("-> Func decl : input");
-  emitRO("IN", ac, 0, 0, "read integer value");
-  emitRM("LDA", sp, 0, fp, "copy fp to sp");
-  emitRM("LD", fp, 0, sp, "pop fp");  
-  emitRM("LDC",ac1,1,0, "ac1 = 1");
-  emitRM("ADD", sp, sp, ac1, "sp = sp + ac1");
-  emitRM("LD", pc, -1, sp, "return address");
-  if(TraceCode) emitComment("<- Func end : input");
-  if(TraceCode) emitComment("-> Func decl : ouput");
-  emitRM("LD", ac, ac1, sp, "load argument" );
-  emitRO("OUT", ac, 0, 0, "write ac");
-  emitRM("LDA", sp, 0, fp, "copy fp to sp");
-  emitRM("LD", fp, 0, sp,"pop fp");
-  emitRM("LDC", ac1, 1, 0, "ac1 = 1");
-  emitRM("ADD", sp, sp, ac1, "mp = mp + ac1");
-  emitRM("LD", pc, -2, sp, "rturn address");
-  if(TraceCode) emitComment("<- Func end : output");
-
-}
-
 /**********************************************/
 /* the primary function of the code generator */
 /**********************************************/
@@ -586,7 +520,6 @@ void codeGen(TreeNode * syntaxTree, char * codefile)
    emitRM("ST",ac,0,ac,"clear location 0");
    emitRM("LDA",fp,0,sp,"sp->fp");
    emitComment("End of standard prelude.");
-//   generateGeneralFunc();
    /* generate code for TINY program */
    scope="Global";
    cGen(syntaxTree);

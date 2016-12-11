@@ -29,6 +29,8 @@
 /* 2nd accumulator */
 #define  ac1 1
 
+#define cp 2
+
 #define fp 4
 
 /* code emitting utilities */

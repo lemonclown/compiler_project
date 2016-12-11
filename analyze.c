@@ -18,6 +18,7 @@ static int isFuncC = FALSE;
 static int globalloc = 0;
 static int staticloc = 0;
 static int paramloc = 0;
+static int isoutFunc = FALSE;
 /* Procedure traverse is a generic recursive 
  * syntax tree traversal routine:
  * it applies preProc in preorder and postProc 
@@ -74,14 +75,33 @@ static void afterInsert( TreeNode * t)
       switch (t->kind.stmt)
       {
         case CompK:
+          // if(isoutFunc){
+          //   pop_scope();
+          //   isoutFunc == TRUE;
+          // }
+          // location--;
+          // paramloc = 0;
+          // staticloc = 0;
+        location--;
+          break;
+        default:
+          break;
+      }
+      break;
+    case DeclK:
+      switch (t->kind.decl)
+      {
+        case FuncK:
           pop_scope();
-          location--;
-          paramloc = 0;
+          paramloc =0;
           staticloc = 0;
           break;
         default:
           break;
       }
+      break;
+    default:
+      break;
   }
 }
 /* Procedure insertNode inserts 
@@ -98,8 +118,8 @@ static void insertNode( TreeNode * t)
             if(isFuncC)
               isFuncC = FALSE;
             else{
-              ScopeList newScope = createscope(scope);
-              push_scope(newScope); location++;
+              // ScopeList newScope = createscope(scope);
+              // push_scope(newScope); location++;
             }
           break;
         default:
@@ -181,7 +201,7 @@ static void insertNode( TreeNode * t)
                 globalloc += t->attr.arr.size;
               }
               else{
-                st_insert("Var", t->attr.arr.name, t->type, t->lineno, location, staticloc);
+                st_insert("Var", t->attr.arr.name, t->type, t->lineno, location, staticloc+t->attr.arr.size);
                 staticloc += t->attr.arr.size;
               }
             }
