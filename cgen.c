@@ -23,6 +23,7 @@ static int argOffset = -3;
 static int isinFunc = FALSE;
 static int isReturned = FALSE;
 static int varOffset = 0;
+static char * prevScope;
 /* prototype for internal recursive code generator */
 static void cGen (TreeNode * tree);
 static char * scope;
@@ -47,7 +48,9 @@ static void genStmt( TreeNode * tree)
           cGen(p1);
           cGen(p2);
           pop_scope(scope_lookup(scope));
-          scope="Global";
+          prevScope = scope;
+          
+
         }
         else{
           cGen(p1);
@@ -198,6 +201,7 @@ static void genExp( TreeNode * tree, int lhs)
         emitComment(buffer);
       }
       loc = st_lookup("scope", tree->attr.name);
+      Scope = scope_lookup(tree->attr.name);
       if(strcmp(tree->attr.name,"input")==0){
           emitRO("IN", ac, 0, 0, "input value");
         }
@@ -208,7 +212,7 @@ static void genExp( TreeNode * tree, int lhs)
           emitRO("OUT", ac, 0,0, "output value");
         }
         else {
-          argOffset = argOffset - paramOffset;
+          argOffset = argOffset - Scope->paramNum + 1;
           reverseTraverse(p1);
           argOffset=-3;
           //return address
@@ -241,16 +245,22 @@ static void genExp( TreeNode * tree, int lhs)
     
     case IdK :
       if (TraceCode) emitComment("-> Id") ;
+      Scope = scope_lookup(scope);
+      paramnum = Scope->paramNum;
       loc = -st_lookup("temp",tree->attr.name);
       type = type_lookup(scope, tree->attr.name);
-      printf("%s : %s : %d\n", tree->attr.name,scope_name, loc);
+      printf("%s : %s : %d // %d\n", tree->attr.name,Scope->name, loc, paramnum);
 
       if(lhs || type == IntegerArray){
         if(strcmp(scope_name,"Global")==0){
           emitRM("LDA", ac, -loc, gp, "store memloc in ac :Global");
         }
         else{
-          emitRM("LDA", ac, loc, fp, "store memloc in ac :Local");
+          if(-loc<paramnum){
+            emitRM("LD", ac, loc, fp, "store arr addr in ac : Local param");
+          }
+          else
+            emitRM("LDA", ac, loc, fp, "store memloc in ac :Local");
         }
       }
       else{
@@ -277,15 +287,14 @@ static void genExp( TreeNode * tree, int lhs)
       
       emitRM("LDC", ac1, loc, 0,"load loc");
       if(lhs){
-        
         if(strcmp(scope_name,"Global")==0){
           emitRO("SUB", ac, ac1, ac, "sub array offset");
           emitRO("ADD", ac, ac, gp, "add arr loc gp, store");
         }
-
         else{
           if(loc<paramnum){
-          emitRO("SUB", ac, fp, ac, "sub arr loc fp, store");
+            emitRM("LD", ac1, -loc, fp, "load base addr of param arr");
+            emitRO("SUB", ac, ac1, ac, "sub array offset");
           }
           else{
             emitRO("ADD", ac, ac1, ac, "add array offset");
@@ -301,12 +310,17 @@ static void genExp( TreeNode * tree, int lhs)
         }
         else{
           if(loc<paramnum){
-            emitRM("LD", ac1, loc, fp, "load base addr of param arr");
+            emitRM("LD", ac1, -loc, fp, "load base addr of param arr");
             emitRO("SUB", ac, ac1, ac, "Sub array offset");
-            emitRM("LD", ac, ac, loc, "load value array offset");
+            emitRM("LD", ac, 0, ac, "load value array offset");
           }
-          else
-            emitRM("LD", ac, fp, ac1, "store memloc in ac :Local");
+          else{
+            printf("Tt\n");
+            //emitRM("LD", ac, fp, ac1, "store memloc in ac :Local");
+            emitRO("ADD", ac, ac1, ac, "add array offset");
+            emitRO("SUB", ac, fp, ac,"sub arr loc fp, store");
+            emitRM("LD", ac, 0, ac, "load value");
+          }
         }
       }
       
@@ -396,6 +410,8 @@ static void genExp( TreeNode * tree, int lhs)
 static void genDecl(TreeNode * tree)
 {
   TreeNode * p1, * p2;
+  ScopeList Scope;
+  int paramnum, varnum;
   int size, loc;
   int currentLoc, savedLoc1, savedLoc2;
   char buffer[100];
@@ -431,6 +447,19 @@ static void genDecl(TreeNode * tree)
         break;
       if (!isReturned){
           if(TraceCode) emitComment("-> Void return");
+            Scope = scope_lookup(prevScope);
+           paramnum = Scope->paramNum;
+           varnum = Scope->varNum;
+           //while(argOffset != -3){
+           printf("%s\n", Scope->name);
+           printf("pn : %d\n", paramnum);
+           printf("vn : %d\n", varnum);
+           paramnum += varnum;
+           //param
+           while(paramnum!=0){
+            emitRM("LDA", sp, 1, sp, "move stack pointer +1 : return");
+            paramnum--;
+          }
           printf("argOFfset : %d\n", argOffset);
            //while(argOffset != -3){
            //param
